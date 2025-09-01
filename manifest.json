@@ -1,0 +1,32 @@
+{
+    "manifest_version": 3,
+    "name": "RepoBuddy",
+    "description": "A helpful AI assistant to help you analyze GitHub repositories.",
+    "version": "0.0",
+    "permissions": ["scripting", "tabs"],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://github.com/*"],
+            "js": ["content.js"],
+            "css": ["content.css"]
+        }
+    ],
+    "host_permissions": ["https://*.vercel.app/*"],
+    "commands": {
+        "open-chat": {
+            "suggested_key": {
+                "default": "Alt+G"
+            },
+            "description": "Open the LLM chat interface to ask your AI assistant questions."
+        }
+    },
+    "web_accessible_resources": [
+        {
+            "resources": ["assets/chevron-up.svg", "assets/chevron-down.svg", "assets/code.svg"],
+            "matches": ["https://github.com/*"]
+        }
+    ]
+}

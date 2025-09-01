@@ -1,0 +1,125 @@
+:root {
+    --colour-bg: "#fff";
+    --colour-subaccent: rgb(158, 81, 81);
+    --colour-chatarea: #eee;
+    --colour-userbubbles: aquamarine;
+    --colour-botbubbles: burlywood;
+    --colour-shadow: rgb(0, 0, 0, 0.3);
+}
+
+#repobuddy-sidebar {
+    position: fixed;
+    z-index: 1000000000000000000000000;
+    top: 0;
+    right: 0;
+    background: var(--colour-bg);
+    box-shadow: -2px 0px 10px var(--colour-shadow);
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+    height: 100%;
+    font-family: Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#repobuddy-topbar {
+    display: flex;
+    flex-direction: row;
+}
+
+#repobuddy-dropdown {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background-color: var(--colour-subaccent);
+}
+
+#repobuddy-dropdown-button {
+    flex: 1;
+    text-overflow: ellipsis;
+    background-color: transparent;
+    outline: none;
+    border: none;
+}
+
+#repobuddy-dropdown-container {
+    padding: 0px 3px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 300px;
+    max-height: 300px;
+    background-color: #eee;
+    box-shadow: 0px 3px 3px var(--colour-shadow);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+#repobuddy-dropdown-checkboxes {
+    padding: 3px 0px;
+    width: 38px;
+    box-shadow: -2px 0px 2px var(--colour-shadow);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+#repobuddy-dropdown-list {
+    padding: 3px 0px;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.repobuddy-dropdown-label {
+    flex: 1;
+    font-size: 13px;
+    height: 20px;
+    font-weight: normal;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+.repobuddy-dropdown-checkbox {
+    align-self: center;
+    justify-content: center;
+    height: 20px;
+}
+
+#repobuddy-chat-area {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    background-color: var(--colour-chatarea);
+    padding: 8px 8px;
+    overflow-y: auto;
+    gap: 8px;
+}
+
+.repobuddy-chat-bubbles {
+    padding: 10px;
+    border-radius: 10px;
+    white-space: pre-wrap;
+    font-size: medium;
+}
+
+.repobuddy-chat-bubbles.user {
+    align-self: flex-end;
+    background-color: var(--colour-userbubbles);
+}
+
+.repobuddy-chat-bubbles.bot {
+    align-self: flex-start;
+    background-color: var(--colour-botbubbles);
+}
+
+#repobuddy-input-box {
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: medium;
+    padding: 10px;
+    box-sizing: border-box;
+    max-height: 130px;
+    resize: none;
+}
