@@ -175,6 +175,7 @@ observer.observe(document.body, { childList: true, subtree: true });
 // files already previously rendered
 let loadedFilesAndFolders = [];
 let allFilePaths;
+let allFileData;
 let fileHierarchy;
 
 // dynamically load files in folders when user clicks on them
@@ -254,6 +255,12 @@ async function loadFilesFolders(folderPath) {
                 
                 labelDiv.appendChild(folderFileIcon);
                 labelDiv.appendChild(label);
+                
+                // checking if the encoding is utf-8, and is thus a text/code file that is valid for the LLM
+                if (allFileData[path]["encoding"] !== "utf-8") {
+                    checkbox.disabled = true;
+                }
+
                 // not the root folder
                 if (currFileLocation['checkboxDiv']) {
                     currFileLocation['checkboxDiv'].appendChild(checkbox);
@@ -302,6 +309,7 @@ async function loadFilesFolders(folderPath) {
 
                     labelDiv.appendChild(folderFileIcon);
                     labelDiv.appendChild(label);
+                    checkbox.style.visibility = "hidden";
                     dropdownCheckboxes.appendChild(checkbox);
                     collapsibleFolder.appendChild(labelDiv); // bundling label divs
                     collapsibleFolder.appendChild(collapsibleSection);
@@ -335,8 +343,8 @@ async function getRepoPaths() {
 
         if (response.ok) {
             const responseData = await response.json();            
-            console.log(responseData.data);
-            allFilePaths = responseData.data;
+            allFilePaths = responseData.filepaths;
+            allFileData = responseData.additionalData;
             
             // clearing the dropdownList and dropdownCheckboxes
             dropdownList.innerHTML = "";
@@ -354,108 +362,6 @@ async function getRepoPaths() {
             };
             console.log(fileHierarchy);
             loadFilesFolders(""); // load all files in root directory
-            // for (let path of allFilePaths) {
-            //     let pathParts = path.split("/"); // splitting file path parts
-
-            //     // Initializing DOM elements
-            //     let collapsibleFolder = document.createElement("div");
-                
-            //     let labelDiv = document.createElement("div");
-            //     labelDiv.style.display = "flex";
-            //     labelDiv.style.flexDirection = "row";
-
-            //     let collapsibleSection = document.createElement("div");
-            //     collapsibleSection.style.paddingLeft = "20px";
-            //     collapsibleSection.style.display = "none";
-            //     collapsibleSection.style.flexDirection = "column";
-            //     collapsibleSection.height = "100px";
-            //     collapsibleSection.width = "100px";
-
-            //     let label = document.createElement("label");
-            //     label.className = "repobuddy-dropdown-label";
-            //     label.for = path;
-            //     label.innerHTML = pathParts[0];
-                
-            //     let checkboxDiv = document.createElement("div");
-            //     checkboxDiv.style.display = "none";
-            //     checkboxDiv.className = "repobuddy-dropdown-subcheckboxes"
-            //     let checkbox = document.createElement("input");
-            //     checkbox.className = "repobuddy-dropdown-checkbox"
-            //     checkbox.type = "checkbox";
-            //     checkbox.id = path;
-            //     checkbox.name = path;
-
-            //     // creating HTML elements, folder display
-            //     let folderFileIcon = document.createElement("img");
-            //     folderFileIcon.style.alignSelf = "center";
-                
-            //     // it's a file
-            //     if (pathParts.length == 1) {
-            //         // updating file hierarchy
-            //         fileHierarchy["content"][pathParts[0]] = {
-            //             "type": "file",
-            //             "content": path,
-            //             "path": path,
-            //         };
-
-            //         // loading DOM elements for file UI
-            //         folderFileIcon.width = "13";
-            //         folderFileIcon.height = "13";
-            //         folderFileIcon.style.marginRight = "5px"
-            //         folderFileIcon.src = chrome.runtime.getURL("assets/code.svg");
-                    
-            //         labelDiv.appendChild(folderFileIcon);
-            //         labelDiv.appendChild(label)
-            //         dropdownCheckboxes.appendChild(checkbox);
-            //         collapsibleFolder.appendChild(labelDiv); // bundling all elements
-
-            //         // store div element used to contain children files
-            //         fileHierarchy['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
-            //         // record loaded files
-            //         loadedFilesAndFolders.push(path);
-            //     } 
-            //     // it's a folder, or a file within more subfolders
-            //     else {
-            //         if (!(pathParts[0] in fileHierarchy["content"])) {
-            //             fileHierarchy["content"][pathParts[0]] = {
-            //                 "type": "folder",
-            //                 "content": {},
-            //                 "path": pathParts[0],
-            //                 "parentDiv": collapsibleSection, // add an ACTUAL subdiv for this
-            //                 "checkboxDiv": checkboxDiv,
-            //             };
-                        
-            //             // loading DOM elements for file UI
-            //             folderFileIcon.width = "16";
-            //             folderFileIcon.height = "16";
-            //             folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
-            //             // folder collapsing functionality
-            //             folderFileIcon.addEventListener("click", () => {
-            //                 if (folderFileIcon.src == chrome.runtime.getURL("assets/chevron-right.svg")) {
-            //                     collapsibleSection.style.display = "flex";
-            //                     checkboxDiv.style.display = "flex";
-            //                     loadFilesFolders(pathParts[0]);
-            //                     folderFileIcon.src = chrome.runtime.getURL("assets/chevron-down.svg");
-            //                 } else {
-            //                     collapsibleSection.style.display = "none";
-            //                     checkboxDiv.style.display = "none";
-            //                     folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
-            //                 }
-            //             })
-
-            //             labelDiv.appendChild(folderFileIcon);
-            //             labelDiv.appendChild(label);
-            //             dropdownCheckboxes.appendChild(checkbox);
-            //             collapsibleFolder.appendChild(labelDiv); // bundling label divs
-            //             collapsibleFolder.appendChild(collapsibleSection);
-
-            //             // store div elements used to contain children files
-            //             fileHierarchy['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
-            //             // record loaded files
-            //             loadedFilesAndFolders.push(pathParts[0]);
-            //         }
-            //     }
-            // }
         } else {
             console.log("RepoBuddy: An error occurred when retrieving repository filepaths. Retry... ");
         }
