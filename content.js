@@ -1,3 +1,5 @@
+"use strict";
+
 function isRepository() {
     const domain = window.location.hostname;
     if (domain == "github.com") {
@@ -12,7 +14,7 @@ function isRepository() {
 
 function getOwnerAndRepo() {
     let sitePath = window.location.pathname
-    pathComps = sitePath.split("/");
+    let pathComps = sitePath.split("/");
     console.log(sitePath, pathComps);
     return { owner: pathComps[1], repo: pathComps[2] }
 }
@@ -89,6 +91,7 @@ function injectSidebar() {
         closeButton = document.getElementById("repobuddy-sidebar-close");
         closeButton.addEventListener('click', () => {
             repobuddySidebar.style.display = "none";
+            document.body.style.marginRight = '0px';
         })
 
         dropdownContainer = document.getElementById("repobuddy-dropdown-container");
@@ -108,20 +111,19 @@ function injectSidebar() {
         chevronButton = document.getElementById("repobuddy-dropdown-chevron");
         chevronButton.src = chrome.runtime.getURL("assets/chevron-down.svg");
         chevronButton.style.cursor = "pointer";
-        chevronButton.addEventListener("click", () => {
-            if (chevronButton.src == chrome.runtime.getURL("assets/chevron-down.svg")) {
-                chevronButton.src = chrome.runtime.getURL("assets/chevron-up.svg");
-            } else {
-                chevronButton.src = chrome.runtime.getURL("assets/chevron-down.svg");
-            }
-        });
 
         document.body.addEventListener("click", (event) => {
             if (dropdownButton.contains(event.target) || chevronButton.contains(event.target)) {
                 showFileDropdown(dropdownContainer.style.visibility == "hidden" ? "visible" : "hidden");
+                if (chevronButton.src == chrome.runtime.getURL("assets/chevron-down.svg")) {
+                    chevronButton.src = chrome.runtime.getURL("assets/chevron-up.svg");
+                } else {
+                    chevronButton.src = chrome.runtime.getURL("assets/chevron-down.svg");
+                }
             }
             else if (!dropdownContainer.contains(event.target)) {
                 showFileDropdown("hidden");
+                chevronButton.src = chrome.runtime.getURL("assets/chevron-down.svg");
             }
         })
 
@@ -158,7 +160,10 @@ const observer = new MutationObserver(() => {
         if (isRepository()) {
             if (document.getElementById("repobuddy-sidebar")) injectSidebar();
         } else {
-            document.body.removeChild(repobuddySidebar);
+            if (repobuddySidebar) {
+                document.body.removeChild(repobuddySidebar);
+                document.body.style.marginRight = '0px';
+            }
         }
     // Do something here
     }
@@ -167,9 +172,153 @@ const observer = new MutationObserver(() => {
 observer.observe(document.body, { childList: true, subtree: true });
 
 
+// files already previously rendered
+let loadedFilesAndFolders = [];
+let allFilePaths;
+let fileHierarchy;
+
+// dynamically load files in folders when user clicks on them
+// i.e. lazy loading
+async function loadFilesFolders(folderPath) {
+    let folderPathParts = [];
+    let currFileLocation = fileHierarchy;
+    
+    if (folderPath != "") {
+        folderPathParts = folderPath.split("/");
+        for (let part of folderPathParts) {
+            currFileLocation = currFileLocation["content"][part];
+        }
+    }
+
+    for (let path of allFilePaths) {
+        if (loadedFilesAndFolders.includes(path)) {
+            continue;
+        };
+        if (path.includes(folderPath) && folderPath !== path) {
+            let pathParts = path.split("/");
+            let newPathParts;
+            if (folderPath != "") {
+                newPathParts = path.replace(folderPath + "/", "").split("/");
+            }
+            // it's a root folder
+            else {
+                newPathParts = path.split("/");
+            }
+
+            // Initializing DOM elements
+            let collapsibleFolder = document.createElement("div");
+            
+            let labelDiv = document.createElement("div");
+            labelDiv.style.display = "flex";
+            labelDiv.style.flexDirection = "row";
+
+            let collapsibleSection = document.createElement("div");
+            collapsibleSection.style.paddingLeft = "20px";
+            collapsibleSection.style.display = "none";
+            collapsibleSection.style.flexDirection = "column";
+            collapsibleSection.height = "100px";
+            collapsibleSection.width = "100px";
+
+            let label = document.createElement("label");
+            label.className = "repobuddy-dropdown-label";
+            label.for = path;
+            label.innerHTML = newPathParts[0];
+            
+            let checkboxDiv = document.createElement("div");
+            checkboxDiv.style.display = "none";
+            checkboxDiv.className = "repobuddy-dropdown-subcheckboxes"
+            let checkbox = document.createElement("input");
+            checkbox.className = "repobuddy-dropdown-checkbox"
+            checkbox.type = "checkbox";
+            checkbox.id = path;
+            checkbox.name = path;
+
+            // creating HTML elements, folder display
+            let folderFileIcon = document.createElement("img");
+            folderFileIcon.style.alignSelf = "center";
+            
+            // it's a file
+            if (pathParts.length - folderPathParts.length == 1) {
+                // updating file hierarchy
+                currFileLocation["content"][newPathParts[0]] = {
+                    "type": "file",
+                    "content": path,
+                    "path": path,
+                };
+
+                // loading DOM elements for file UI
+                folderFileIcon.width = "13";
+                folderFileIcon.height = "13";
+                folderFileIcon.style.marginRight = "5px"
+                folderFileIcon.src = chrome.runtime.getURL("assets/code.svg");
+                
+                labelDiv.appendChild(folderFileIcon);
+                labelDiv.appendChild(label);
+                // not the root folder
+                if (currFileLocation['checkboxDiv']) {
+                    currFileLocation['checkboxDiv'].appendChild(checkbox);
+                    dropdownCheckboxes.appendChild(currFileLocation['checkboxDiv']);
+                } 
+                // it's the root folder
+                else {
+                    dropdownCheckboxes.appendChild(checkbox);
+                }
+                collapsibleFolder.appendChild(labelDiv); // bundling all elements
+
+                // store div element used to contain children files
+                currFileLocation['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
+                // record loaded files
+                loadedFilesAndFolders.push(path);
+            } 
+            // it's a folder, or a file within more subfolders
+            else {
+                // if folder does not already exist, create it
+                if (!(newPathParts[0] in currFileLocation["content"])) {
+                    currFileLocation["content"][newPathParts[0]] = {
+                        "type": "folder",
+                        "content": {},
+                        "path": folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0],
+                        "parentDiv": collapsibleSection, 
+                        "checkboxDiv": checkboxDiv,
+                    };
+
+                    // loading DOM elements for file UI
+                    folderFileIcon.width = "16";
+                    folderFileIcon.height = "16";
+                    folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
+                    // folder collapsing functionality
+                    folderFileIcon.addEventListener("click", () => {
+                        if (folderFileIcon.src == chrome.runtime.getURL("assets/chevron-right.svg")) {
+                            collapsibleSection.style.display = "flex";
+                            checkboxDiv.style.display = "flex";
+                            loadFilesFolders(folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
+                            folderFileIcon.src = chrome.runtime.getURL("assets/chevron-down.svg");
+                        } else {
+                            collapsibleSection.style.display = "none";
+                            checkboxDiv.style.display = "none";
+                            folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
+                        }
+                    })
+
+                    labelDiv.appendChild(folderFileIcon);
+                    labelDiv.appendChild(label);
+                    dropdownCheckboxes.appendChild(checkbox);
+                    collapsibleFolder.appendChild(labelDiv); // bundling label divs
+                    collapsibleFolder.appendChild(collapsibleSection);
+
+                    // store div elements used to contain children files
+                    currFileLocation['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
+                    // record loaded files
+                    loadedFilesAndFolders.push(folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
+                }
+
+            }
+        }
+    }
+}
+
 // GITHUB RETRIEVAL
 async function getRepoPaths() {
-    console.log('start');
     if (isRepository()) {
         const { owner, repo } = getOwnerAndRepo();
         const response = await fetch("https://repobuddy-service.vercel.app/api/githubInfo", {
@@ -187,104 +336,126 @@ async function getRepoPaths() {
         if (response.ok) {
             const responseData = await response.json();            
             console.log(responseData.data);
+            allFilePaths = responseData.data;
             
             // clearing the dropdownList and dropdownCheckboxes
             dropdownList.innerHTML = "";
             dropdownCheckboxes.innerHTML = "";
 
+            // initialize div to contain all file UI
             let fileDiv = document.createElement("div");
             dropdownList.appendChild(fileDiv);
+
             // convert pathnames to JSON-style fileHierarchy
-            const fileHierarchy = {
+            fileHierarchy = {
                 "type": "root", 
                 "parentDiv": fileDiv, 
-                "content": {}
+                "content": {},
             };
-            for (let path of responseData.data) {
-                let pathParts = path.split("/");
-                let currFileLocation = fileHierarchy;
+            console.log(fileHierarchy);
+            loadFilesFolders(""); // load all files in root directory
+            // for (let path of allFilePaths) {
+            //     let pathParts = path.split("/"); // splitting file path parts
+
+            //     // Initializing DOM elements
+            //     let collapsibleFolder = document.createElement("div");
                 
-                for (let i = 0; i < pathParts.length; i++) {
+            //     let labelDiv = document.createElement("div");
+            //     labelDiv.style.display = "flex";
+            //     labelDiv.style.flexDirection = "row";
 
-                    let collapsibleFolder = document.createElement("div");
+            //     let collapsibleSection = document.createElement("div");
+            //     collapsibleSection.style.paddingLeft = "20px";
+            //     collapsibleSection.style.display = "none";
+            //     collapsibleSection.style.flexDirection = "column";
+            //     collapsibleSection.height = "100px";
+            //     collapsibleSection.width = "100px";
+
+            //     let label = document.createElement("label");
+            //     label.className = "repobuddy-dropdown-label";
+            //     label.for = path;
+            //     label.innerHTML = pathParts[0];
+                
+            //     let checkboxDiv = document.createElement("div");
+            //     checkboxDiv.style.display = "none";
+            //     checkboxDiv.className = "repobuddy-dropdown-subcheckboxes"
+            //     let checkbox = document.createElement("input");
+            //     checkbox.className = "repobuddy-dropdown-checkbox"
+            //     checkbox.type = "checkbox";
+            //     checkbox.id = path;
+            //     checkbox.name = path;
+
+            //     // creating HTML elements, folder display
+            //     let folderFileIcon = document.createElement("img");
+            //     folderFileIcon.style.alignSelf = "center";
+                
+            //     // it's a file
+            //     if (pathParts.length == 1) {
+            //         // updating file hierarchy
+            //         fileHierarchy["content"][pathParts[0]] = {
+            //             "type": "file",
+            //             "content": path,
+            //             "path": path,
+            //         };
+
+            //         // loading DOM elements for file UI
+            //         folderFileIcon.width = "13";
+            //         folderFileIcon.height = "13";
+            //         folderFileIcon.style.marginRight = "5px"
+            //         folderFileIcon.src = chrome.runtime.getURL("assets/code.svg");
                     
-                    let labelDiv = document.createElement("div");
-                    labelDiv.style.display = "flex";
-                    labelDiv.style.flexDirection = "row";
+            //         labelDiv.appendChild(folderFileIcon);
+            //         labelDiv.appendChild(label)
+            //         dropdownCheckboxes.appendChild(checkbox);
+            //         collapsibleFolder.appendChild(labelDiv); // bundling all elements
 
-                    let collapsibleSection = document.createElement("div");
-                    collapsibleSection.style.paddingLeft = "20px";
-                    collapsibleSection.style.display = "flex";
-                    collapsibleSection.style.flexDirection = "column";
-                    collapsibleSection.height = "100px";
-                    collapsibleSection.width = "100px";
-
-                    let label = document.createElement("label");
-                    label.className = "repobuddy-dropdown-label";
-                    label.for = path;
-                    label.innerHTML = pathParts[i];
-                    console.log(pathParts[i]);
-                    
-                    let checkbox = document.createElement("input");
-                    checkbox.className = "repobuddy-dropdown-checkbox"
-                    checkbox.type = "checkbox";
-                    checkbox.id = path;
-                    checkbox.name = path;
-
-                    // creating HTML elements, folder display
-                    let folderFileIcon = document.createElement("img");
-                    folderFileIcon.style.alignSelf = "center";
-                    
-                    if (i == pathParts.length-1) {
-                        currFileLocation["content"][pathParts[i]] = {
-                            "type": "file",
-                            "content": path
-                        };
-
-                        folderFileIcon.width = "13";
-                        folderFileIcon.height = "13";
-                        folderFileIcon.style.marginRight = "5px"
-                        folderFileIcon.src = chrome.runtime.getURL("assets/code.svg");
+            //         // store div element used to contain children files
+            //         fileHierarchy['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
+            //         // record loaded files
+            //         loadedFilesAndFolders.push(path);
+            //     } 
+            //     // it's a folder, or a file within more subfolders
+            //     else {
+            //         if (!(pathParts[0] in fileHierarchy["content"])) {
+            //             fileHierarchy["content"][pathParts[0]] = {
+            //                 "type": "folder",
+            //                 "content": {},
+            //                 "path": pathParts[0],
+            //                 "parentDiv": collapsibleSection, // add an ACTUAL subdiv for this
+            //                 "checkboxDiv": checkboxDiv,
+            //             };
                         
-                        labelDiv.appendChild(folderFileIcon);
-                        labelDiv.appendChild(label)
-                        dropdownCheckboxes.appendChild(checkbox);
-                        collapsibleFolder.appendChild(labelDiv); // bundling all elements
+            //             // loading DOM elements for file UI
+            //             folderFileIcon.width = "16";
+            //             folderFileIcon.height = "16";
+            //             folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
+            //             // folder collapsing functionality
+            //             folderFileIcon.addEventListener("click", () => {
+            //                 if (folderFileIcon.src == chrome.runtime.getURL("assets/chevron-right.svg")) {
+            //                     collapsibleSection.style.display = "flex";
+            //                     checkboxDiv.style.display = "flex";
+            //                     loadFilesFolders(pathParts[0]);
+            //                     folderFileIcon.src = chrome.runtime.getURL("assets/chevron-down.svg");
+            //                 } else {
+            //                     collapsibleSection.style.display = "none";
+            //                     checkboxDiv.style.display = "none";
+            //                     folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
+            //                 }
+            //             })
 
-                        currFileLocation['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
-                    } else {
-                        if (!(pathParts[i] in currFileLocation["content"])) {
-                            currFileLocation["content"][pathParts[i]] = {
-                                "type": "folder",
-                                "content": {},
-                                "parentDiv": collapsibleSection, // add an ACTUAL subdiv for this
-                            }
-                            
-                            folderFileIcon.width = "16";
-                            folderFileIcon.height = "16";
-                            folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
-                            folderFileIcon.addEventListener("click", () => {
-                                if (folderFileIcon.src == chrome.runtime.getURL("assets/chevron-right.svg")) {
-                                    folderFileIcon.src = chrome.runtime.getURL("assets/chevron-down.svg");
-                                } else {
-                                    folderFileIcon.src = chrome.runtime.getURL("assets/chevron-right.svg");
-                                }
-                            })
-    
-                            labelDiv.appendChild(folderFileIcon);
-                            labelDiv.appendChild(label);
-                            dropdownCheckboxes.appendChild(checkbox);
-                            collapsibleFolder.appendChild(labelDiv); // bundling label divs
-                            collapsibleFolder.appendChild(collapsibleSection);
-    
-                            currFileLocation['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
-                        }
-                        
-                        // updating curr path
-                        currFileLocation = currFileLocation["content"][pathParts[i]];
-                    }
-                }
-            }
+            //             labelDiv.appendChild(folderFileIcon);
+            //             labelDiv.appendChild(label);
+            //             dropdownCheckboxes.appendChild(checkbox);
+            //             collapsibleFolder.appendChild(labelDiv); // bundling label divs
+            //             collapsibleFolder.appendChild(collapsibleSection);
+
+            //             // store div elements used to contain children files
+            //             fileHierarchy['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
+            //             // record loaded files
+            //             loadedFilesAndFolders.push(pathParts[0]);
+            //         }
+            //     }
+            // }
         } else {
             console.log("RepoBuddy: An error occurred when retrieving repository filepaths. Retry... ");
         }

@@ -45,7 +45,7 @@
 }
 
 #repobuddy-dropdown-container {
-    padding: 0px 3px;
+    padding: 0px 8px;
     position: absolute;
     top: 100%;
     left: 0;
@@ -61,9 +61,15 @@
 
 #repobuddy-dropdown-checkboxes {
     padding: 3px 0px;
-    width: 38px;
+    width: 28px;
     box-shadow: -2px 0px 2px var(--colour-shadow);
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: none;
+}
+
+.repobuddy-dropdown-subcheckboxes {
     display: flex;
     flex-direction: column;
 }
@@ -73,6 +79,7 @@
     flex: 1;
     overflow-x: auto;
     overflow-y: auto;
+    scrollbar-width: none;
 }
 
 .repobuddy-dropdown-label {
@@ -81,11 +88,13 @@
     height: 20px;
     font-weight: normal;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
+    white-space: nowrap;
 }
 .repobuddy-dropdown-checkbox {
     align-self: center;
     justify-content: center;
-    height: 20px;
+    min-height: 20px;
+    max-height: 20px;
 }
 
 #repobuddy-chat-area {
