@@ -292,7 +292,7 @@ async function loadFilesFolders(folderPath) {
         if (loadedFilesAndFolders.includes(path)) {
             continue;
         };
-        if (path.includes(folderPath) && folderPath !== path) {
+        if (path.startsWith(folderPath) === true && folderPath !== path) {
             let pathParts = path.split("/");
             let newPathParts;
             if (folderPath !== "") {
@@ -334,6 +334,7 @@ async function loadFilesFolders(folderPath) {
             
             // it's a file
             if (pathParts.length - folderPathParts.length == 1) {
+                console.log(path, pathParts.length, folderPathParts.length);
                 // updating file hierarchy
                 currFileLocation["content"][newPathParts[0]] = {
                     "type": "file",
@@ -381,7 +382,6 @@ async function loadFilesFolders(folderPath) {
             else {
                 // if folder does not already exist, create it
                 if (!(newPathParts[0] in currFileLocation["content"])) {
-                    console.log(newPathParts[0]);
                     currFileLocation["content"][newPathParts[0]] = {
                         "type": "folder",
                         "content": {},
