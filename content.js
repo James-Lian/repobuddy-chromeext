@@ -36,6 +36,12 @@ let dropdownButton;
 let dropdownList;
 let dropdownCheckboxes;
 let chevronButton;
+let selectedFilesContainer;
+let selectedFilesCounter;
+let selectedFilesCounterText;
+let selectedFilesCounterClear;
+let selectedFiles;
+let selectedFilesSendButton;
 
 let keysPressed = {};
 
@@ -52,8 +58,15 @@ function injectSidebar() {
                 <button id="repobuddy-sidebar-close">Close</button>
                 <div id="repobuddy-dropdown">
                     <div id="repobuddy-dropdown-container">
-                        <div id="repobuddy-dropdown-list"></div>
-                        <div id="repobuddy-dropdown-checkboxes"></div>
+                        <div style="display: flex; flex-direction: row; align-items: stretch; flex: 1; padding: 0px 8px; min-height: 0;">
+                            <div id="repobuddy-dropdown-list"></div>
+                            <div id="repobuddy-dropdown-checkboxes"></div>
+                        </div>
+                        <div id="repobuddy-selected-files-container">
+                            <div id="repobuddy-selected-files-counter"><span id="repobuddy-selected-files-counter-text">No files selected.</span><a id='repobuddy-selected-files-clear'>Clear</a></div>
+                            <div id="repobuddy-selected-files"></div>
+                            <button id="repobuddy-selected-files-send-button" disabled>Send (0) files</button>
+                        </div>
                     </div>
                     <button id="repobuddy-dropdown-button">Select Files 🔽</button>
                     <img id="repobuddy-dropdown-chevron" width="20px" height="20px" />
@@ -71,7 +84,7 @@ function injectSidebar() {
         document.body.appendChild(sidebar);
         document.body.style.marginRight = '300px';
 
-        repobuddySidebar = document.getElementById("repobuddy-sidebar")
+        repobuddySidebar = document.getElementById("repobuddy-sidebar");
 
         // ATTACH EVENT LISTENERS
         chatArea = document.getElementById("repobuddy-chat-area");
@@ -111,6 +124,24 @@ function injectSidebar() {
         chevronButton = document.getElementById("repobuddy-dropdown-chevron");
         chevronButton.src = chrome.runtime.getURL("assets/chevron-down.svg");
         chevronButton.style.cursor = "pointer";
+
+        selectedFilesContainer = document.getElementById("repobuddy-selected-files-container");
+        selectedFilesCounter = document.getElementById("repobuddy-selected-files-counter");
+        selectedFilesCounterText = document.getElementById("repobuddy-selected-files-counter-text");
+        selectedFilesCounterClear = document.getElementById("repobuddy-selected-files-clear");
+        selectedFilesCounterClear.addEventListener("click", () => {
+            selectedFilesCounterText.innerHTML = "No files selected.";
+            selectedFilesSendButton.disabled = true;
+            setTimeout(() => {
+                for (let file of userSelectedFiles) {
+                    file["checkbox"].checked = false;
+                }
+                userSelectedFiles.length = 0;
+            }, 0)
+            selectedFiles.innerHTML = "";
+        });
+        selectedFiles = document.getElementById("repobuddy-selected-files");
+        selectedFilesSendButton = document.getElementById("repobuddy-selected-files-send-button");
 
         document.body.addEventListener("click", (event) => {
             if (dropdownButton.contains(event.target) || chevronButton.contains(event.target)) {
@@ -158,7 +189,8 @@ const observer = new MutationObserver(() => {
         console.log("URL changed:", location.href);
         currentUrl = location.href;
         if (isRepository()) {
-            if (document.getElementById("repobuddy-sidebar")) injectSidebar();
+            injectSidebar();
+            document.body.style.marginRight = '300px';
         } else {
             if (repobuddySidebar) {
                 document.body.removeChild(repobuddySidebar);
@@ -172,6 +204,71 @@ const observer = new MutationObserver(() => {
 observer.observe(document.body, { childList: true, subtree: true });
 
 
+// file extensions that are commonly encoded in utf-8
+let textFileExtensions = [
+    ".adoc",
+    ".astro",
+    ".bash",
+    ".bat",
+    ".c",
+    ".conf",
+    ".cpp",
+    ".cs",
+    ".css",
+    ".csv",
+    ".dockerfile",
+    ".env",
+    ".gitattributes",
+    ".gitignore",
+    ".go",
+    ".h",
+    ".hpp",
+    ".htm",
+    ".html",
+    ".ini",
+    ".ipynb",
+    ".java",
+    ".js",
+    ".json",
+    ".jsx",
+    ".kt",
+    ".less",
+    ".log",
+    ".makefile",
+    ".markdown",
+    ".md",
+    ".org",
+    ".php",
+    ".pl",
+    ".ps1",
+    ".py",
+    ".r",
+    ".rb",
+    ".rs",
+    ".rst",
+    ".sass",
+    ".scss",
+    ".sh",
+    ".swift",
+    ".tex",
+    ".toml",
+    ".ts",
+    ".tsv",
+    ".tsx",
+    ".txt",
+    ".vue",
+    ".xml",
+    ".yaml",
+    ".yml"
+]
+
+function isATextFile(filename) {
+    for (let fileExt of textFileExtensions) {
+        if (filename.endsWith(fileExt)) return true;
+    }
+    return false;
+}
+
 // files already previously rendered
 let loadedFilesAndFolders = [];
 let allFilePaths;
@@ -184,7 +281,7 @@ async function loadFilesFolders(folderPath) {
     let folderPathParts = [];
     let currFileLocation = fileHierarchy;
     
-    if (folderPath != "") {
+    if (folderPath !== "") {
         folderPathParts = folderPath.split("/");
         for (let part of folderPathParts) {
             currFileLocation = currFileLocation["content"][part];
@@ -198,7 +295,7 @@ async function loadFilesFolders(folderPath) {
         if (path.includes(folderPath) && folderPath !== path) {
             let pathParts = path.split("/");
             let newPathParts;
-            if (folderPath != "") {
+            if (folderPath !== "") {
                 newPathParts = path.replace(folderPath + "/", "").split("/");
             }
             // it's a root folder
@@ -222,7 +319,6 @@ async function loadFilesFolders(folderPath) {
 
             let label = document.createElement("label");
             label.className = "repobuddy-dropdown-label";
-            label.for = path;
             label.innerHTML = newPathParts[0];
             
             let checkboxDiv = document.createElement("div");
@@ -231,8 +327,6 @@ async function loadFilesFolders(folderPath) {
             let checkbox = document.createElement("input");
             checkbox.className = "repobuddy-dropdown-checkbox"
             checkbox.type = "checkbox";
-            checkbox.id = path;
-            checkbox.name = path;
 
             // creating HTML elements, folder display
             let folderFileIcon = document.createElement("img");
@@ -250,21 +344,27 @@ async function loadFilesFolders(folderPath) {
                 // loading DOM elements for file UI
                 folderFileIcon.width = "13";
                 folderFileIcon.height = "13";
-                folderFileIcon.style.marginRight = "5px"
+                folderFileIcon.style.marginRight = "5px";
                 folderFileIcon.src = chrome.runtime.getURL("assets/code.svg");
                 
+                label.for = path;
+
                 labelDiv.appendChild(folderFileIcon);
                 labelDiv.appendChild(label);
                 
-                // checking if the encoding is utf-8, and is thus a text/code file that is valid for the LLM
-                if (allFileData[path]["encoding"] !== "utf-8") {
+                // checking if the file extension is typical of a file encoding that is utf-8, and is thus a text/code file that is valid for the LLM
+                if (!isATextFile(path)) {
                     checkbox.disabled = true;
                 }
+                checkbox.id = path;
+                checkbox.name = path;
+                checkbox.addEventListener("change", () => {
+                    handleSelectedFiles(path, checkbox.checked, checkbox);
+                })
 
                 // not the root folder
                 if (currFileLocation['checkboxDiv']) {
                     currFileLocation['checkboxDiv'].appendChild(checkbox);
-                    dropdownCheckboxes.appendChild(currFileLocation['checkboxDiv']);
                 } 
                 // it's the root folder
                 else {
@@ -281,10 +381,11 @@ async function loadFilesFolders(folderPath) {
             else {
                 // if folder does not already exist, create it
                 if (!(newPathParts[0] in currFileLocation["content"])) {
+                    console.log(newPathParts[0]);
                     currFileLocation["content"][newPathParts[0]] = {
                         "type": "folder",
                         "content": {},
-                        "path": folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0],
+                        "path": folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0],
                         "parentDiv": collapsibleSection, 
                         "checkboxDiv": checkboxDiv,
                     };
@@ -298,7 +399,7 @@ async function loadFilesFolders(folderPath) {
                         if (folderFileIcon.src == chrome.runtime.getURL("assets/chevron-right.svg")) {
                             collapsibleSection.style.display = "flex";
                             checkboxDiv.style.display = "flex";
-                            loadFilesFolders(folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
+                            loadFilesFolders(folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
                             folderFileIcon.src = chrome.runtime.getURL("assets/chevron-down.svg");
                         } else {
                             collapsibleSection.style.display = "none";
@@ -308,21 +409,87 @@ async function loadFilesFolders(folderPath) {
                     })
 
                     labelDiv.appendChild(folderFileIcon);
+                    label.for = folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0];
                     labelDiv.appendChild(label);
+
+                    checkbox.id = folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0];
+                    checkbox.name = folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0];
                     checkbox.style.visibility = "hidden";
-                    dropdownCheckboxes.appendChild(checkbox);
+                    if (currFileLocation['checkboxDiv']) {
+                        currFileLocation['checkboxDiv'].appendChild(checkbox);
+                        currFileLocation['checkboxDiv'].appendChild(checkboxDiv);
+                    } 
+                    // it's the root folder
+                    else {
+                        dropdownCheckboxes.appendChild(checkbox);
+                        dropdownCheckboxes.appendChild(checkboxDiv);
+                    }
                     collapsibleFolder.appendChild(labelDiv); // bundling label divs
                     collapsibleFolder.appendChild(collapsibleSection);
 
                     // store div elements used to contain children files
                     currFileLocation['parentDiv'].appendChild(collapsibleFolder); // adding to DOM
                     // record loaded files
-                    loadedFilesAndFolders.push(folderPath != "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
+                    loadedFilesAndFolders.push(folderPath !== "" ? folderPath + "/" + newPathParts[0] : newPathParts[0]);
                 }
 
             }
         }
     }
+}
+
+let userSelectedFiles = [];
+function handleSelectedFiles(filepath, checked, checkbox) {
+    if (checked) {
+        userSelectedFiles.push({"filepath": filepath, "checkbox": checkbox});
+        selectedFiles.innerHTML = "";
+
+        for (let i = 0; i < userSelectedFiles.length; i++) {
+            let item = userSelectedFiles[i];
+
+            let selectedFileButton = document.createElement('div');
+            selectedFileButton.className = "repobuddy-selected-file-button"
+            let selectedFileLabel = document.createElement('div');
+            selectedFileLabel.innerHTML = item.filepath
+            let selectedFileDelete = document.createElement('img');
+            selectedFileDelete.width = 16;
+            selectedFileDelete.height = 16;
+            selectedFileDelete.src = chrome.runtime.getURL('assets/x.svg');
+            
+            selectedFileDelete.addEventListener("click", () => {
+                // setTimeout so that the element is removed AFTER the document-wide click listener registers
+                setTimeout(() => {
+                    selectedFileButton.remove();
+                    const itemToUncheck = userSelectedFiles.find(elem => elem.filepath === item.filepath)
+                    itemToUncheck["checkbox"].checked = false;
+                    userSelectedFiles = userSelectedFiles.filter(elem => elem.filepath !== item.filepath);
+                }, 0)
+            });
+            
+            selectedFileButton.appendChild(selectedFileLabel);
+            selectedFileButton.appendChild(selectedFileDelete);
+
+            selectedFiles.appendChild(selectedFileButton);
+
+            userSelectedFiles[i]["selectedFileButton"] = selectedFileButton;
+        }
+    } else {
+        for (let item of userSelectedFiles) {
+            if (item.filepath === filepath) {
+                item["selectedFileButton"].remove();
+            }
+        }
+        userSelectedFiles = userSelectedFiles.filter(item => item.filepath !== filepath);
+    }
+
+    if (userSelectedFiles.length === 0) {
+        selectedFilesCounterText.innerHTML = "No files selected."
+        selectedFilesSendButton.disabled = true;
+    } else {
+        selectedFilesCounterText.innerHTML = `${userSelectedFiles.length} files selected.`
+        selectedFilesSendButton.disabled = false;
+    }
+    selectedFilesSendButton.innerHTML = `Send (${userSelectedFiles.length}) files`
 }
 
 // GITHUB RETRIEVAL
@@ -342,8 +509,38 @@ async function getRepoPaths() {
         });
 
         if (response.ok) {
-            const responseData = await response.json();            
-            allFilePaths = responseData.filepaths;
+            const responseData = await response.json();
+            let unsortedFiles = responseData.filepaths;
+            // sort by folder then file, and then alphabetically
+            unsortedFiles.sort((a, b) => {
+                let aPathParts = a.split("/");
+                let bPathParts = b.split("/");
+                if (aPathParts.length === 1 && bPathParts.length !== 1) {
+                    return 1;
+                } else if (bPathParts.length === 1 && aPathParts.length !== 1) {
+                    return -1;
+                } else if (aPathParts.length === 1 && bPathParts.length === 1) {
+                    return a.localeCompare(b);
+                }
+                for (let i = 0; i < Math.min(aPathParts.length, bPathParts.length); i++) {
+                    if (aPathParts[i] !== bPathParts[i]) {
+                        if (i === aPathParts.length - 1) {
+                            return 1;
+                        } else if (i === bPathParts.length -1) {
+                            return -1;
+                        }
+                        return aPathParts[i].localeCompare(bPathParts[i]);
+                    }
+                }
+                // parent folders come before childrem
+                if (aPathParts.length < bPathParts.length) {
+                    return -1;
+                } else {
+                    return 1;
+                }
+            });
+
+            allFilePaths = Array.from(unsortedFiles);
             allFileData = responseData.additionalData;
             
             // clearing the dropdownList and dropdownCheckboxes
@@ -360,7 +557,6 @@ async function getRepoPaths() {
                 "parentDiv": fileDiv, 
                 "content": {},
             };
-            console.log(fileHierarchy);
             loadFilesFolders(""); // load all files in root directory
         } else {
             console.log("RepoBuddy: An error occurred when retrieving repository filepaths. Retry... ");
